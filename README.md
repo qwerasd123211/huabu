@@ -4,9 +4,10 @@
 
 ## 技术栈
 
-- **前端**: React 19 + Vite + TypeScript + Canvas 2D + Zustand
-- **后端**: Express + TypeScript + Anthropic SDK (GLM-5)
-- **语音**: Web Speech API (Chrome)
+- **前端**: React 19 + Vite 8 + TypeScript 6 + Zustand 5 + Canvas 2D
+- **后端**: Express 4 + TypeScript + 智谱 GLM-5 + AgnesAI
+- **语音**: 浏览器原生 SpeechRecognition (zh-CN) + iFlytek WebSocket
+- **UI**: 暗色主题，实时语音交互
 
 ## 快速启动
 
@@ -17,6 +18,13 @@ cd frontend && npm install && npm run dev
 # 后端
 cd server && npm install && npm run dev
 ```
+
+## 功能特性
+
+- 语音唤醒: 说"小花小花"唤醒助手
+- 语音绘图: 说"画一个红色的房子"自动生成图像
+- 修改指令: 撤销、重做、清空画布
+- 实时交互: TTS 语音回复，对话式操作
 
 ## 项目结构
 
