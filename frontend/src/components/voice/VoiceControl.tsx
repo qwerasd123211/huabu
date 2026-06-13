@@ -26,6 +26,16 @@ function speak(text: string, onEnd?: () => void) {
   window.speechSynthesis.speak(u);
 }
 
+const STATUS_STYLES: Record<string, { label: string; color: string }> = {
+  sleeping: { label: '说"小花小花"唤醒', color: 'var(--accent-primary)' },
+  waking: { label: '唤醒了！', color: 'var(--accent-glow)' },
+  greeting: { label: '你好，我在', color: 'var(--accent-glow)' },
+  listening: { label: '正在聆听…', color: 'var(--success)' },
+  processing: { label: '正在画…', color: 'var(--warning)' },
+  speaking: { label: '小花回复中…', color: 'var(--accent-glow)' },
+  error: { label: '出错了', color: 'var(--danger)' },
+};
+
 export default function VoiceControl() {
   const status = useVoiceStore((s) => s.status);
   const setStatus = useVoiceStore((s) => s.setStatus);
@@ -300,19 +310,7 @@ export default function VoiceControl() {
   }, [isListening, startListening, stopListening, setStatus, setError]);
 
   const isActive = status !== 'sleeping' && status !== 'error';
-
-  const statusLabel = (() => {
-    switch (status) {
-      case 'sleeping': return '说"小花小花"唤醒我';
-      case 'waking': return '唤醒了！';
-      case 'greeting': return '小花：我在，请问有什么可以帮您的？';
-      case 'listening': return '正在聆听...说出你想画的内容';
-      case 'processing': return '正在画到画布上...';
-      case 'speaking': return '小花回复中...';
-      case 'error': return '出错了，点击重试';
-      default: return '说"小花小花"唤醒我';
-    }
-  })();
+  const statusInfo = STATUS_STYLES[status] || STATUS_STYLES.sleeping;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
@@ -350,10 +348,28 @@ export default function VoiceControl() {
         </svg>
       </button>
 
-      <span style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', maxWidth: 200, lineHeight: 1.5 }}>
-        {statusLabel}
+      <span style={{ fontSize: 12, color: statusInfo.color, textAlign: 'center', maxWidth: 200, lineHeight: 1.5 }}>
+        {statusInfo.label}
       </span>
 
+      <div
+        style={{
+          width: '100%',
+          padding: '10px 12px',
+          background: 'var(--bg-tertiary)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-sm)',
+          color: 'var(--text-muted)',
+          fontSize: 12,
+          lineHeight: 1.8,
+        }}
+      >
+        <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>可直接说：</div>
+        <div>画一个蓝色圆形</div>
+        <div>画蓝天白云和太阳</div>
+        <div>撤销、重做、清空画布</div>
+        <div>停止、不画了</div>
+      </div>
     </div>
   );
 }
