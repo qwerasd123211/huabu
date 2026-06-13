@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 interface AppLayoutProps {
   canvas: ReactNode;
   sidebar: ReactNode;
-  toolbar: ReactNode;
+  toolbar?: ReactNode;
 }
 
 export default function AppLayout({ canvas, sidebar, toolbar }: AppLayoutProps) {
@@ -31,15 +31,17 @@ export default function AppLayout({ canvas, sidebar, toolbar }: AppLayoutProps) 
         }}
       >
         {canvas}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            paddingTop: 10,
-          }}
-        >
-          {toolbar}
-        </div>
+        {toolbar && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              paddingTop: 10,
+            }}
+          >
+            {toolbar}
+          </div>
+        )}
       </div>
 
       <div

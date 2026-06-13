@@ -47,8 +47,6 @@ export default function VoiceControl() {
   const canvasWidth = useCanvasStore((s) => s.canvasWidth);
   const canvasHeight = useCanvasStore((s) => s.canvasHeight);
 
-  const [textInput, setTextInput] = useState('');
-  const [showTextInput, setShowTextInput] = useState(false);
   const [assistantText, setAssistantText] = useState('');
 
   const statusRef = useRef(status);
@@ -147,7 +145,6 @@ export default function VoiceControl() {
         addCommandEntry({ id: uuidv4(), text, timestamp: Date.now(), response: '绘图失败，请重试', confidence: 0 });
       }
 
-      setTextInput('');
       setGenerating(false);
       setStatus('speaking');
 
@@ -254,7 +251,6 @@ export default function VoiceControl() {
     (error: string) => {
       if (error === 'not-allowed') {
         setError(error);
-        setShowTextInput(true);
         return;
       }
       if (error === 'no-speech' || error === 'aborted') return;
@@ -322,7 +318,7 @@ export default function VoiceControl() {
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
       {!isSupported && (
         <div style={{ padding: '8px 12px', background: 'rgba(255,167,38,0.15)', border: '1px solid var(--warning)', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--warning)', textAlign: 'center' }}>
-          请使用 Chrome 浏览器，或使用下方文字输入。
+          请使用 Chrome 浏览器并允许麦克风权限。
         </div>
       )}
 
@@ -358,26 +354,6 @@ export default function VoiceControl() {
         {statusLabel}
       </span>
 
-      <button onClick={() => setShowTextInput(!showTextInput)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
-        {showTextInput ? '收起' : '或直接输入文字指令'}
-      </button>
-
-      {showTextInput && (
-        <div style={{ width: '100%', display: 'flex', gap: 8 }}>
-          <input
-            type="text" value={textInput}
-            onChange={(e) => setTextInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && textInput.trim()) processCommand(textInput.trim()); }}
-            placeholder='输入指令，如"画一个红色的房子"'
-            disabled={status === 'processing'}
-            style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
-          />
-          <button onClick={() => textInput.trim() && processCommand(textInput.trim())} disabled={status === 'processing' || !textInput.trim()}
-            style={{ padding: '8px 14px', background: 'var(--accent-primary)', border: 'none', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            发送
-          </button>
-        </div>
-      )}
     </div>
   );
 }
