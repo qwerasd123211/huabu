@@ -97,14 +97,15 @@ export default function VoiceControl() {
       wrappedSpeak(reply);
 
       try {
-        let parsed = parseCommandLocally(text);
+        const contextSummary = getContextSummary();
+        let parsed = parseCommandLocally(text, contextSummary);
 
         if (!parsed) {
           try {
             parsed = await parseCommand({
               transcript: text,
               canvasState: {
-                objects: getContextSummary(),
+                objects: contextSummary,
                 width: canvasWidth,
                 height: canvasHeight,
               },

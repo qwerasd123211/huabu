@@ -1,4 +1,4 @@
-import type { DrawingOperation } from '../types/dsl';
+import type { CanvasObjectSummary, DrawingOperation } from '../types/dsl';
 
 // Local pattern-based command parser as fallback when LLM is unavailable
 // Matches common Chinese voice drawing commands
@@ -72,18 +72,73 @@ function extractPosition(text: string): { x: number; y: number } {
   return { x, y };
 }
 
+function hasExplicitPosition(text: string): boolean {
+  return /左边|左侧|右边|右侧|中间|中心|上面|上方|顶部|下面|下方|底部/.test(text);
+}
+
+function overlaps(a: CanvasObjectSummary['bbox'], b: CanvasObjectSummary['bbox']): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function isBackgroundBox(box: CanvasObjectSummary['bbox']): boolean {
+  return box.w >= 720 && box.h >= 520;
+}
+
+function makeBBox(cx: number, cy: number, w: number, h: number): CanvasObjectSummary['bbox'] {
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+
+function createAutoPlacer(text: string, existingObjects: CanvasObjectSummary[] = []) {
+  const occupied = existingObjects
+    .map((obj) => obj.bbox)
+    .filter((box) => !isBackgroundBox(box));
+
+  const slots = [
+    { x: 180, y: 170 },
+    { x: 400, y: 170 },
+    { x: 620, y: 170 },
+    { x: 170, y: 330 },
+    { x: 400, y: 330 },
+    { x: 630, y: 330 },
+    { x: 240, y: 470 },
+    { x: 520, y: 470 },
+  ];
+
+  return (fallback: { x: number; y: number }, footprint = { w: 140, h: 120 }): { x: number; y: number } => {
+    if (hasExplicitPosition(text)) return extractPosition(text);
+
+    const candidates = [fallback, ...slots];
+    for (const candidate of candidates) {
+      const bbox = makeBBox(candidate.x, candidate.y, footprint.w, footprint.h);
+      if (!occupied.some((box) => overlaps(box, bbox))) {
+        occupied.push(bbox);
+        return candidate;
+      }
+    }
+
+    const index = occupied.length % slots.length;
+    const wrapped = slots[index];
+    occupied.push(makeBBox(wrapped.x, wrapped.y, footprint.w, footprint.h));
+    return wrapped;
+  };
+}
+
 function extractSize(text: string): number {
   if (text.includes('大') || text.includes('巨大')) return 1.5;
   if (text.includes('小') || text.includes('很小')) return 0.6;
   return 1.0;
 }
 
-export function parseCommandLocally(transcript: string): ParsedCommand | null {
+export function parseCommandLocally(
+  transcript: string,
+  existingObjects: CanvasObjectSummary[] = []
+): ParsedCommand | null {
   const text = transcript.trim();
   if (!text) return null;
 
   const ops: DrawingOperation[] = [];
   const explanations: string[] = [];
+  const place = createAutoPlacer(text, existingObjects);
 
   // --- Clear ---
   if (/^(清空|清除|清屏|全部清除|擦除全部)$/.test(text)) {
@@ -151,10 +206,10 @@ export function parseCommandLocally(transcript: string): ParsedCommand | null {
 
   // --- Circle ---
   if (text.includes('圆') || text.includes('太阳')) {
-    const pos = extractPosition(text);
     const scale = extractSize(text);
     const color = extractColor(text) || '#FFD700';
     const isSun = text.includes('太阳');
+    const pos = place(isSun ? { x: 650, y: 140 } : { x: 400, y: 300 }, { w: 110 * scale, h: 110 * scale });
     const id = isSun ? nextId('sun') : nextId('circle');
     ops.push({
       op: 'draw',
@@ -171,10 +226,10 @@ export function parseCommandLocally(transcript: string): ParsedCommand | null {
 
   // --- Rectangle / House ---
   if (text.includes('房子') || text.includes('方形') || text.includes('长方形') || text.includes('矩形')) {
-    const pos = extractPosition(text);
     const isHouse = text.includes('房子');
     const color = extractColor(text) || '#FFE0B2';
     const id = isHouse ? nextId('house') : nextId('rect');
+    const pos = place(isHouse ? { x: 400, y: 350 } : { x: 400, y: 300 }, isHouse ? { w: 150, h: 150 } : { w: 150, h: 110 });
 
     ops.push({
       op: 'draw',
@@ -222,7 +277,7 @@ export function parseCommandLocally(transcript: string): ParsedCommand | null {
 
   // --- Triangle ---
   if (text.includes('三角') && !text.includes('房子')) {
-    const pos = extractPosition(text);
+    const pos = place({ x: 400, y: 300 }, { w: 140, h: 140 });
     const color = extractColor(text) || '#9B59B6';
     const id = nextId('tri');
     const s = 60;
@@ -240,7 +295,7 @@ export function parseCommandLocally(transcript: string): ParsedCommand | null {
 
   // --- Tree ---
   if (text.includes('树')) {
-    const pos = extractPosition(text);
+    const pos = place({ x: 180, y: 380 }, { w: 120, h: 150 });
     const id = nextId('tree');
     ops.push({
       op: 'draw',
@@ -255,7 +310,7 @@ export function parseCommandLocally(transcript: string): ParsedCommand | null {
 
   // --- Cloud ---
   if (text.includes('云')) {
-    const pos = extractPosition(text);
+    const pos = place({ x: 240, y: 150 }, { w: 130, h: 90 });
     const id = nextId('cloud');
     ops.push({
       op: 'draw', shape: { kind: 'circle', id: `${id}-1`, cx: pos.x, cy: pos.y, radius: 22, fill: '#FFF', stroke: '#E0E0E0', strokeWidth: 1 },
@@ -271,7 +326,7 @@ export function parseCommandLocally(transcript: string): ParsedCommand | null {
 
   // --- Boat ---
   if (text.includes('船')) {
-    const pos = extractPosition(text);
+    const pos = place({ x: 350, y: 430 }, { w: 160, h: 110 });
     const id = nextId('boat');
     ops.push({
       op: 'draw', shape: {
@@ -292,7 +347,7 @@ export function parseCommandLocally(transcript: string): ParsedCommand | null {
 
   // --- Flower ---
   if (text.includes('花')) {
-    const pos = extractPosition(text);
+    const pos = place({ x: 560, y: 390 }, { w: 100, h: 140 });
     const id = nextId('flower');
     const r = 12;
     const offsets = [[0, -16], [14, -6], [10, 12], [-10, 12], [-14, -6]];
@@ -312,7 +367,7 @@ export function parseCommandLocally(transcript: string): ParsedCommand | null {
 
   // --- Heart ---
   if (text.includes('爱心') || text.includes('心形')) {
-    const pos = extractPosition(text);
+    const pos = place({ x: 400, y: 300 }, { w: 90, h: 90 });
     const id = nextId('heart');
     const s = 30;
     ops.push({
@@ -334,7 +389,7 @@ export function parseCommandLocally(transcript: string): ParsedCommand | null {
 
   // --- Star ---
   if (text.includes('星星') || text.includes('五角星')) {
-    const pos = extractPosition(text);
+    const pos = place({ x: 560, y: 160 }, { w: 90, h: 90 });
     const id = nextId('star');
     const outerR = 30, innerR = 12;
     const points: number[] = [];
