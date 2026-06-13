@@ -12,10 +12,10 @@ export default function AppLayout({ canvas, sidebar, toolbar }: AppLayoutProps) 
       style={{
         flex: 1,
         display: 'grid',
-        gridTemplateColumns: '1fr 320px',
+        gridTemplateColumns: '1fr 300px',
         gridTemplateRows: '1fr auto',
         gap: 16,
-        padding: 16,
+        padding: 20,
         minHeight: 0,
         overflow: 'hidden',
       }}
@@ -28,6 +28,7 @@ export default function AppLayout({ canvas, sidebar, toolbar }: AppLayoutProps) 
           flexDirection: 'column',
           minWidth: 0,
           minHeight: 0,
+          gap: 0,
         }}
       >
         {canvas}
@@ -36,7 +37,8 @@ export default function AppLayout({ canvas, sidebar, toolbar }: AppLayoutProps) 
             style={{
               display: 'flex',
               justifyContent: 'center',
-              paddingTop: 10,
+              paddingTop: 14,
+              flexShrink: 0,
             }}
           >
             {toolbar}
@@ -50,7 +52,7 @@ export default function AppLayout({ canvas, sidebar, toolbar }: AppLayoutProps) 
           gridColumn: '2',
           display: 'flex',
           flexDirection: 'column',
-          gap: 16,
+          gap: 14,
           minHeight: 0,
           overflow: 'hidden',
         }}

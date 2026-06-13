@@ -5,21 +5,22 @@ export default function MinimalToolbar() {
   const redo = useCanvasStore((s) => s.redo);
   const clear = useCanvasStore((s) => s.clear);
   const objects = useCanvasStore((s) => s.objects);
+  const hasItems = objects.length > 0;
 
   const buttons = [
-    { label: '撤销', icon: '↩', action: undo, disabled: objects.length === 0 },
-    { label: '重做', icon: '↪', action: redo, disabled: objects.length === 0 },
-    { label: '清空', icon: '✕', action: clear, disabled: objects.length === 0, danger: true },
+    { label: '撤销', icon: '↩', action: undo, disabled: !hasItems },
+    { label: '重做', icon: '↪', action: redo, disabled: !hasItems },
+    { label: '清空', icon: '✕', action: clear, disabled: !hasItems, danger: true },
   ];
 
   return (
     <div
       style={{
         display: 'flex',
-        gap: 6,
-        padding: '8px 12px',
-        background: 'var(--bg-secondary)',
-        borderRadius: 'var(--radius-md)',
+        gap: 4,
+        padding: '6px 8px',
+        background: 'var(--ink-light)',
+        borderRadius: 'var(--radius)',
         border: '1px solid var(--border)',
       }}
     >
@@ -30,21 +31,32 @@ export default function MinimalToolbar() {
           disabled={btn.disabled}
           title={btn.label}
           style={{
-            padding: '6px 14px',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-sm)',
-            background: 'var(--bg-tertiary)',
-            color: btn.disabled ? 'var(--text-muted)' : btn.danger ? 'var(--danger)' : 'var(--text-primary)',
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: 'var(--radius)',
+            background: btn.disabled ? 'transparent' : 'transparent',
+            color: btn.disabled ? 'var(--text-muted)' : btn.danger ? 'var(--danger)' : 'var(--text-secondary)',
             cursor: btn.disabled ? 'not-allowed' : 'pointer',
-            fontSize: 13,
+            fontSize: 12,
             display: 'flex',
             alignItems: 'center',
-            gap: 4,
-            transition: 'all var(--transition)',
+            gap: 5,
+            fontFamily: 'var(--font-body)',
+            transition: 'all 0.2s ease',
             opacity: btn.disabled ? 0.4 : 1,
           }}
+          onMouseEnter={(e) => {
+            if (!btn.disabled) {
+              e.currentTarget.style.background = 'var(--ink-mid)';
+              e.currentTarget.style.color = 'var(--text-primary)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = btn.disabled ? 'var(--text-muted)' : btn.danger ? 'var(--danger)' : 'var(--text-secondary)';
+          }}
         >
-          <span>{btn.icon}</span>
+          <span style={{ fontSize: 14 }}>{btn.icon}</span>
           <span>{btn.label}</span>
         </button>
       ))}
