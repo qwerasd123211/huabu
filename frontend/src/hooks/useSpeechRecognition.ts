@@ -140,10 +140,11 @@ export const useSpeechRecognition = (options: UseSpeechRecognitionOptions = {}) 
       if (!visibleText) return;
       setTranscript(visibleText);
 
-      // Wake word detection — skip onResult entirely if wake word found
-      if (!ref.current.woken && containsWakeWord(visibleText)) {
+      // Wake word detection only runs on final results so half-spoken wake words
+      // do not interrupt the user's phrase.
+      if (!ref.current.woken && finalText && containsWakeWord(finalText)) {
         ref.current.woken = true;
-        ref.current.onWakeWord?.(visibleText);
+        ref.current.onWakeWord?.(finalText);
         return;
       }
 
