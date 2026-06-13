@@ -53,7 +53,7 @@ export default function DrawingCanvas() {
 
     let raf = 0;
     const render = () => {
-      ctx.fillStyle = '#1a1a24';
+      ctx.fillStyle = '#121010';
       ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
       renderCanvas(ctx, objects, canvasWidth, canvasHeight);
@@ -61,8 +61,8 @@ export default function DrawingCanvas() {
       for (const layer of images) {
         const img = loadedImages.get(layer.id);
         if (!img || !img.complete) {
-          ctx.fillStyle = '#24243a';
-          ctx.strokeStyle = '#6c5ce7';
+          ctx.fillStyle = '#1e1a18';
+          ctx.strokeStyle = 'rgba(212,145,42,0.3)';
           ctx.lineWidth = 2;
           const pw = 800 * layer.scale;
           const ph = 800 * layer.scale;
@@ -70,8 +70,8 @@ export default function DrawingCanvas() {
           const py = layer.y - ph / 2;
           ctx.fillRect(px, py, pw, ph);
           ctx.strokeRect(px, py, pw, ph);
-          ctx.fillStyle = '#9898b0';
-          ctx.font = '16px sans-serif';
+          ctx.fillStyle = '#8a8070';
+          ctx.font = '14px "Noto Sans SC", "PingFang SC", sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText('AI 正在生成图像...', layer.x, layer.y);
           continue;
@@ -105,14 +105,14 @@ export default function DrawingCanvas() {
         ctx.drawImage(img, x, y, w, h);
         ctx.restore();
 
-        ctx.fillStyle = '#9898b0';
-        ctx.font = '12px sans-serif';
+        ctx.fillStyle = '#8a8070';
+        ctx.font = '12px "Noto Sans SC", "PingFang SC", sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(layer.prompt.slice(0, 60), layer.x, y + h + 20);
       }
 
       if (objects.length === 0 && images.length === 0) {
-        ctx.strokeStyle = '#2a2a3e';
+        ctx.strokeStyle = '#2a2520';
         ctx.lineWidth = 1;
         for (let x = 0; x <= canvasWidth; x += 100) {
           ctx.beginPath();
@@ -144,10 +144,11 @@ export default function DrawingCanvas() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#0a0a12',
-        borderRadius: 'var(--radius-lg)',
+        background: 'var(--ink)',
+        borderRadius: 'var(--radius)',
         overflow: 'hidden',
         position: 'relative',
+        border: '1px solid var(--border)',
       }}
     >
       <canvas
@@ -156,8 +157,8 @@ export default function DrawingCanvas() {
         height={canvasHeight}
         style={{
           display: 'block',
-          borderRadius: '8px',
-          boxShadow: '0 0 40px rgba(108, 92, 231, 0.08)',
+          borderRadius: 'var(--radius)',
+          boxShadow: '0 0 40px rgba(212,145,42,0.05)',
           maxWidth: '100%',
           maxHeight: '100%',
           objectFit: 'contain',

@@ -12,18 +12,24 @@ export default function RecognizedText() {
   return (
     <div
       style={{
-        padding: '10px 14px',
-        background: 'var(--bg-tertiary)',
-        borderRadius: 'var(--radius-sm)',
+        padding: '12px 16px',
+        background: 'var(--ink-light)',
+        borderRadius: 'var(--radius)',
         border: '1px solid var(--border)',
         fontSize: 14,
         color: finalText ? 'var(--text-primary)' : 'var(--text-muted)',
         fontStyle: interimText ? 'italic' : 'normal',
-        minHeight: 40,
+        minHeight: 44,
         wordBreak: 'break-word',
+        lineHeight: 1.6,
+        fontFamily: 'var(--font-body)',
       }}
     >
-      {displayText || <span style={{ color: 'var(--text-muted)' }}>说到的话会显示在这里...</span>}
+      {displayText || (
+        <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+          说到的话会显示在这里…
+        </span>
+      )}
     </div>
   );
 }

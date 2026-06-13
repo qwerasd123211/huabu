@@ -140,10 +140,12 @@ export const useSpeechRecognition = (options: UseSpeechRecognitionOptions = {}) 
       if (!visibleText) return;
       setTranscript(visibleText);
 
-      // Wake word detection — skip onResult entirely if wake word found
-      if (!ref.current.woken && containsWakeWord(visibleText)) {
+      // Wake word detection — only trigger on final results, not interim.
+      // Speaking is gradual: "小花" (interim) → "小花小花" (final).
+      // If we trigger on interim, half-said wake words fire prematurely.
+      if (!ref.current.woken && finalText && containsWakeWord(finalText)) {
         ref.current.woken = true;
-        ref.current.onWakeWord?.(visibleText);
+        ref.current.onWakeWord?.(finalText);
         return;
       }
 

@@ -1,4 +1,4 @@
-const AGNES_API_KEY = process.env.AGNES_API_KEY?.trim() || 'sk-Sme3ewQG5ikW9238gcbqoRW1YbTOl3JSKWNdoooASSqJ48LT';
+const AGNES_API_KEY = process.env.AGNES_API_KEY?.trim() || '';
 const AGNES_BASE_URL = process.env.AGNES_BASE_URL?.trim() || 'https://apihub.agnes-ai.com';
 const AGNES_MODEL = process.env.AGNES_MODEL?.trim() || 'agnes-image-2.1-flash';
 
@@ -14,6 +14,10 @@ interface ImageGenerationResponse {
 }
 
 export async function generateImage(params: ImageGenerationParams): Promise<ImageGenerationResponse> {
+  if (!AGNES_API_KEY) {
+    throw new Error('AGNES_API_KEY is not configured');
+  }
+
   const body: Record<string, unknown> = {
     model: AGNES_MODEL,
     prompt: params.prompt,
