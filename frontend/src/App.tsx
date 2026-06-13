@@ -9,15 +9,33 @@ import ObjectInspector from './components/sidebar/ObjectInspector'
 function App() {
   const sidebar = (
     <>
+      <div style={{
+        color: 'var(--text-secondary)',
+        fontSize: 12,
+        fontWeight: 500,
+        letterSpacing: '0.04em',
+        marginBottom: 8,
+        fontFamily: 'var(--font-body)',
+      }}>
+        语音控制
+      </div>
       <VoiceControl />
       <RecognizedText />
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        <div style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
-          指令历史
-        </div>
-        <CommandHistory />
+      <div style={{
+        color: 'var(--text-secondary)',
+        fontSize: 12,
+        fontWeight: 500,
+        letterSpacing: '0.04em',
+        marginBottom: 8,
+        marginTop: 4,
+        fontFamily: 'var(--font-body)',
+      }}>
+        指令历史
       </div>
-      <ObjectInspector />
+      <CommandHistory />
+      <div style={{ marginTop: 14 }}>
+        <ObjectInspector />
+      </div>
     </>
   )
 
