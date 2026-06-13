@@ -282,7 +282,7 @@ export default function VoiceControl() {
   // Wrap speak to suspend/resume mic input
   const wrappedSpeak = useCallback((text: string, onEnd?: () => void) => {
     suspendInput();
-    wrappedSpeak(text, () => {
+    speak(text, () => {
       resumeInput();
       onEnd?.();
     });
