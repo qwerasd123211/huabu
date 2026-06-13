@@ -26,6 +26,16 @@ function speak(text: string, onEnd?: () => void) {
   window.speechSynthesis.speak(u);
 }
 
+const STATUS_STYLES: Record<string, { label: string; dotColor: string; ringColor: string }> = {
+  sleeping: { label: '说"小花小花"唤醒', dotColor: 'var(--accent)', ringColor: 'rgba(212,145,42,0.3)' },
+  waking: { label: '唤醒了！', dotColor: 'var(--accent-glow)', ringColor: 'rgba(232,168,76,0.5)' },
+  greeting: { label: '你好，我在', dotColor: 'var(--accent-glow)', ringColor: 'rgba(232,168,76,0.4)' },
+  listening: { label: '正在聆听…', dotColor: 'var(--success)', ringColor: 'rgba(90,154,90,0.4)' },
+  processing: { label: '正在画…', dotColor: 'var(--warning)', ringColor: 'rgba(212,145,42,0.4)' },
+  speaking: { label: '小花回复中…', dotColor: 'var(--accent-glow)', ringColor: 'rgba(232,168,76,0.3)' },
+  error: { label: '出错了', dotColor: 'var(--danger)', ringColor: 'rgba(196,74,63,0.4)' },
+};
+
 export default function VoiceControl() {
   const status = useVoiceStore((s) => s.status);
   const setStatus = useVoiceStore((s) => s.setStatus);
@@ -47,8 +57,6 @@ export default function VoiceControl() {
   const canvasWidth = useCanvasStore((s) => s.canvasWidth);
   const canvasHeight = useCanvasStore((s) => s.canvasHeight);
 
-  const [textInput, setTextInput] = useState('');
-  const [showTextInput, setShowTextInput] = useState(false);
   const [assistantText, setAssistantText] = useState('');
 
   const statusRef = useRef(status);
@@ -57,7 +65,6 @@ export default function VoiceControl() {
 
   const [cooldown, setCooldown] = useState(false);
 
-  // Cooldown: 3s after speaking done, ignore voice input
   const startCooldown = useCallback(() => {
     setCooldown(true);
     setTimeout(() => setCooldown(false), 3000);
@@ -67,7 +74,6 @@ export default function VoiceControl() {
     async (text: string) => {
       if (!text.trim()) return;
 
-      // Handle stop commands immediately
       if (isStopCommand(text)) {
         setStatus('speaking');
         setAssistantText('好的，不画了。');
@@ -147,17 +153,14 @@ export default function VoiceControl() {
         addCommandEntry({ id: uuidv4(), text, timestamp: Date.now(), response: '绘图失败，请重试', confidence: 0 });
       }
 
-      setTextInput('');
       setGenerating(false);
       setStatus('speaking');
 
       const doneReply = DONE_REPLIES[Math.floor(Math.random() * DONE_REPLIES.length)];
       setAssistantText(doneReply);
       wrappedSpeak(doneReply, () => {
-        // Back to listening — mic was never stopped
         setStatus('listening');
         resetForCmdRef.current();
-        // Start cooldown after TTS finishes
         startCooldown();
       });
     },
@@ -186,14 +189,12 @@ export default function VoiceControl() {
     setStatus('waking');
 
     if (fullText) {
-      // Extract command after wake word
       const cleaned = fullText.replace(/^[，,。.！!？?、\s]+/, '').replace(/[，,。.！!？?、\s]+$/, '');
       for (const w of ['小花', '笑话', '小化', '消化']) {
         const idx = cleaned.indexOf(w);
         if (idx !== -1) {
           const afterWake = cleaned.substring(idx + w.length).replace(/^[，,。.！!？?、\s]+/, '');
           if (afterWake && afterWake.length > 1) {
-            // Wake word + command in one breath
             const greeting = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
             setAssistantText(greeting);
             wrappedSpeak(greeting, () => {
@@ -207,7 +208,6 @@ export default function VoiceControl() {
       }
     }
 
-    // Just wake word
     const greeting = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
     setAssistantText(greeting);
     wrappedSpeak(greeting, () => {
@@ -220,7 +220,6 @@ export default function VoiceControl() {
   handleWakeRef.current = handleWake;
 
   const onWake = useCallback((fullText?: string) => {
-    // Ignore wake word during processing or cooldown
     if (statusRef.current !== 'sleeping') return;
     handleWakeRef.current(fullText);
   }, []);
@@ -240,9 +239,8 @@ export default function VoiceControl() {
         setInterimText(text);
         return;
       }
-      // Ignore input while generating or in cooldown
       if (statusRef.current === 'processing' || statusRef.current === 'speaking') return;
-      if (cooldown) return; // 3s cooldown after TTS
+      if (cooldown) return;
       if (text.trim()) {
         processCommandRef.current(text.trim());
       }
@@ -254,7 +252,6 @@ export default function VoiceControl() {
     (error: string) => {
       if (error === 'not-allowed') {
         setError(error);
-        setShowTextInput(true);
         return;
       }
       if (error === 'no-speech' || error === 'aborted') return;
@@ -279,10 +276,9 @@ export default function VoiceControl() {
 
   resetForCmdRef.current = resetForCommand;
 
-  // Wrap speak to suspend/resume mic input
   const wrappedSpeak = useCallback((text: string, onEnd?: () => void) => {
     suspendInput();
-    wrappedSpeak(text, () => {
+    speak(text, () => {
       resumeInput();
       onEnd?.();
     });
@@ -304,31 +300,39 @@ export default function VoiceControl() {
   }, [isListening, startListening, stopListening, setStatus, setError]);
 
   const isActive = status !== 'sleeping' && status !== 'error';
-
-  const statusLabel = (() => {
-    switch (status) {
-      case 'sleeping': return '说"小花小花"唤醒我';
-      case 'waking': return '唤醒了！';
-      case 'greeting': return '小花：我在，请问有什么可以帮您的？';
-      case 'listening': return '正在聆听...说出你想画的内容';
-      case 'processing': return '正在画到画布上...';
-      case 'speaking': return '小花回复中...';
-      case 'error': return '出错了，点击重试';
-      default: return '说"小花小花"唤醒我';
-    }
-  })();
+  const statusInfo = STATUS_STYLES[status] || STATUS_STYLES.sleeping;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '8px 0' }}>
       {!isSupported && (
-        <div style={{ padding: '8px 12px', background: 'rgba(255,167,38,0.15)', border: '1px solid var(--warning)', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--warning)', textAlign: 'center' }}>
+        <div style={{
+          padding: '10px 16px',
+          background: 'rgba(212,145,42,0.1)',
+          border: '1px solid rgba(212,145,42,0.3)',
+          borderRadius: 'var(--radius)',
+          fontSize: 12,
+          color: 'var(--accent)',
+          textAlign: 'center',
+          lineHeight: 1.5,
+        }}>
           请使用 Chrome 浏览器，或使用下方文字输入。
         </div>
       )}
 
       {assistantText && (
-        <div style={{ padding: '8px 14px', background: 'linear-gradient(135deg, rgba(108,92,231,0.2), rgba(0,206,201,0.15))', border: '1px solid var(--accent-glow)', borderRadius: '16px', fontSize: 13, color: '#dfe6e9', textAlign: 'center', maxWidth: 240, animation: 'fadeIn 0.3s ease' }}>
-          🤖 {assistantText}
+        <div style={{
+          padding: '10px 18px',
+          background: 'var(--ink-light)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          fontSize: 13,
+          color: 'var(--text-primary)',
+          textAlign: 'center',
+          maxWidth: 260,
+          lineHeight: 1.6,
+          fontFamily: 'var(--font-body)',
+        }}>
+          {assistantText}
         </div>
       )}
 
@@ -336,16 +340,24 @@ export default function VoiceControl() {
         onClick={handleToggleMic}
         disabled={!isSupported}
         style={{
-          width: 72, height: 72, borderRadius: '50%', border: 'none',
+          width: 76,
+          height: 76,
+          borderRadius: '50%',
+          border: `2px solid ${statusInfo.dotColor}`,
           cursor: isSupported ? 'pointer' : 'not-allowed',
-          background: isActive ? '#ef5350' : status === 'sleeping' ? 'linear-gradient(135deg, #6c5ce7, #a29bfe)' : 'linear-gradient(135deg, var(--accent-primary), var(--accent-glow))',
-          boxShadow: isActive ? '0 0 30px rgba(239,83,80,0.5)' : '0 0 25px rgba(108,92,231,0.6), 0 0 60px rgba(108,92,231,0.2)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'all var(--transition)',
-          animation: isActive ? 'voice-pulse 1.5s ease-in-out infinite' : 'wake-pulse 2.5s ease-in-out infinite',
+          background: status === 'listening'
+            ? 'radial-gradient(circle, rgba(90,154,90,0.15), transparent)'
+            : status === 'sleeping'
+              ? 'radial-gradient(circle, rgba(212,145,42,0.1), transparent)'
+              : 'radial-gradient(circle, rgba(232,168,76,0.1), transparent)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'all 0.3s ease',
+          animation: isActive ? 'listen-pulse 2s ease-in-out infinite' : 'breathe 3s ease-in-out infinite',
         }}
       >
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-primary)', opacity: 0.9 }}>
           {isActive ? (
             <><rect x="6" y="6" width="4" height="12" rx="1" /><rect x="14" y="6" width="4" height="12" rx="1" /></>
           ) : (
@@ -354,30 +366,36 @@ export default function VoiceControl() {
         </svg>
       </button>
 
-      <span style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', maxWidth: 200, lineHeight: 1.5 }}>
-        {statusLabel}
+      <span style={{
+        fontSize: 12,
+        color: statusInfo.dotColor,
+        textAlign: 'center',
+        maxWidth: 200,
+        lineHeight: 1.6,
+        fontFamily: 'var(--font-body)',
+      }}>
+        {statusInfo.label}
       </span>
 
-      <button onClick={() => setShowTextInput(!showTextInput)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
-        {showTextInput ? '收起' : '或直接输入文字指令'}
-      </button>
-
-      {showTextInput && (
-        <div style={{ width: '100%', display: 'flex', gap: 8 }}>
-          <input
-            type="text" value={textInput}
-            onChange={(e) => setTextInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && textInput.trim()) processCommand(textInput.trim()); }}
-            placeholder='输入指令，如"画一个红色的房子"'
-            disabled={status === 'processing'}
-            style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
-          />
-          <button onClick={() => textInput.trim() && processCommand(textInput.trim())} disabled={status === 'processing' || !textInput.trim()}
-            style={{ padding: '8px 14px', background: 'var(--accent-primary)', border: 'none', borderRadius: 'var(--radius-sm)', color: '#fff', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            发送
-          </button>
-        </div>
-      )}
+      <div
+        style={{
+          width: '100%',
+          padding: '12px 14px',
+          background: 'var(--ink-light)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          color: 'var(--text-muted)',
+          fontSize: 12,
+          lineHeight: 1.8,
+          fontFamily: 'var(--font-body)',
+        }}
+      >
+        <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>可直接说：</div>
+        <div>画一个蓝色圆形</div>
+        <div>画蓝天白云和太阳</div>
+        <div>撤销、重做、清空画布</div>
+        <div>停止、不画了</div>
+      </div>
     </div>
   );
 }
