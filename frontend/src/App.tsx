@@ -5,7 +5,6 @@ import VoiceControl from './components/voice/VoiceControl'
 import RecognizedText from './components/voice/RecognizedText'
 import CommandHistory from './components/sidebar/CommandHistory'
 import ObjectInspector from './components/sidebar/ObjectInspector'
-import MinimalToolbar from './components/toolbar/MinimalToolbar'
 
 function App() {
   const sidebar = (
@@ -28,7 +27,6 @@ function App() {
       <AppLayout
         canvas={<DrawingCanvas />}
         sidebar={sidebar}
-        toolbar={<MinimalToolbar />}
       />
     </div>
   )
