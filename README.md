@@ -5,7 +5,7 @@
 ## Demo
 
 - 在线体验：[https://huabu-gamma.vercel.app/](https://huabu-gamma.vercel.app/)
-- Demo 视频：录制后在这里填写公开视频链接
+- Demo 视频：[https://b23.tv/IrcnIXd](https://b23.tv/IrcnIXd)
 - 设计文档：[docs/DESIGN.md](docs/DESIGN.md)
 
 ## 核心能力
