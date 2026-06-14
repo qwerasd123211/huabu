@@ -11,6 +11,10 @@ const GREETINGS = ['我在，请问有什么可以帮您的？', '我在呢，�
 const THINKING_REPLIES = ['好的，马上画。', '收到，我来画。'];
 const DONE_REPLIES = ['画好了，看看怎么样？', '完成啦，还想画什么告诉我哦。'];
 
+function normalizeSpeechText(text: string): string {
+  return text.toLowerCase().replace(/[\s，,。.！!？?、\-\—~～…\.]/g, '');
+}
+
 function speak(text: string, onEnd?: () => void) {
   if (!('speechSynthesis' in window)) {
     onEnd?.();
@@ -62,6 +66,8 @@ export default function VoiceControl() {
   const statusRef = useRef(status);
   statusRef.current = status;
   const resetForCmdRef = useRef<() => void>(() => {});
+  const assistantSpeechRef = useRef<Array<{ text: string; expiresAt: number }>>([]);
+  const inputMutedUntilRef = useRef(0);
 
   const [cooldown, setCooldown] = useState(false);
 
@@ -69,6 +75,33 @@ export default function VoiceControl() {
   const startCooldown = useCallback(() => {
     setCooldown(true);
     setTimeout(() => setCooldown(false), 3000);
+  }, []);
+
+  const rememberAssistantSpeech = useCallback((text: string) => {
+    const normalized = normalizeSpeechText(text);
+    if (!normalized) return;
+    const now = Date.now();
+    assistantSpeechRef.current = [
+      ...assistantSpeechRef.current.filter((item) => item.expiresAt > now),
+      { text: normalized, expiresAt: now + 12000 },
+    ].slice(-10);
+    inputMutedUntilRef.current = Math.max(inputMutedUntilRef.current, now + 1200);
+  }, []);
+
+  const isAssistantEcho = useCallback((text: string): boolean => {
+    const normalized = normalizeSpeechText(text);
+    if (!normalized) return true;
+
+    const now = Date.now();
+    assistantSpeechRef.current = assistantSpeechRef.current.filter((item) => item.expiresAt > now);
+    if (now < inputMutedUntilRef.current) return true;
+
+    return assistantSpeechRef.current.some((item) => {
+      if (normalized === item.text) return true;
+      if (normalized.length >= 4 && item.text.includes(normalized)) return true;
+      if (item.text.length >= 4 && normalized.includes(item.text)) return true;
+      return false;
+    });
   }, []);
 
   const processCommand = useCallback(
@@ -244,6 +277,7 @@ export default function VoiceControl() {
 
   const onSubmit = useCallback(
     (text: string, isFinal: boolean) => {
+      if (isAssistantEcho(text)) return;
       if (!isFinal) {
         setInterimText(text);
         return;
@@ -288,12 +322,13 @@ export default function VoiceControl() {
 
   // Wrap speak to suspend/resume mic input
   const wrappedSpeak = useCallback((text: string, onEnd?: () => void) => {
+    rememberAssistantSpeech(text);
     suspendInput();
     speak(text, () => {
       resumeInput();
       onEnd?.();
     });
-  }, [suspendInput, resumeInput]);
+  }, [rememberAssistantSpeech, suspendInput, resumeInput]);
 
   useEffect(() => { setSupported(speechSupported); }, [speechSupported, setSupported]);
 
