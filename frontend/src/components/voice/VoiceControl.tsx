@@ -105,6 +105,7 @@ export default function VoiceControl() {
   const statusRef = useRef(status);
   statusRef.current = status;
   const resetForCmdRef = useRef<() => void>(() => {});
+  const waitForWakeRef = useRef<() => void>(() => {});
   const assistantSpeechRef = useRef<Array<{ text: string; expiresAt: number }>>([]);
   const inputMutedUntilRef = useRef(0);
 
@@ -151,14 +152,15 @@ export default function VoiceControl() {
       // Handle stop commands immediately
       if (isStopCommand(commandText)) {
         setStatus('speaking');
-        setAssistantText('好的，不画了。');
-        wrappedSpeak('好的，不画了。', () => {
-          setStatus('listening');
-          resetForCmdRef.current();
+        setAssistantText('好的，不画了。需要我时再喊小花小花。');
+        wrappedSpeak('好的，不画了。需要我时再喊小花小花。', () => {
+          waitForWakeRef.current();
+          setStatus('sleeping');
+          startCooldown();
         });
         addCommandEntry({
           id: uuidv4(), text: commandText, timestamp: Date.now(),
-          response: '已停止', confidence: 1.0,
+          response: '已停止，等待再次唤醒', confidence: 1.0,
         });
         return;
       }
@@ -425,6 +427,7 @@ export default function VoiceControl() {
     startListening,
     stopListening,
     resetForCommand,
+    waitForWakeWord,
     suspendInput,
     resumeInput,
     isSupported: speechSupported,
@@ -435,6 +438,7 @@ export default function VoiceControl() {
   });
 
   resetForCmdRef.current = resetForCommand;
+  waitForWakeRef.current = waitForWakeWord;
 
   // Wrap speak to suspend/resume mic input
   const wrappedSpeak = useCallback((text: string, onEnd?: () => void) => {

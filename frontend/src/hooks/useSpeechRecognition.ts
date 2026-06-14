@@ -249,6 +249,13 @@ export const useSpeechRecognition = (options: UseSpeechRecognitionOptions = {}) 
     setTranscript('');
   }, []);
 
+  const waitForWakeWord = useCallback(() => {
+    ref.current.woken = false;
+    ref.current.listening = false;
+    ref.current.lastFinal = '';
+    setTranscript('');
+  }, []);
+
   useEffect(() => {
     if (!getBrowserSpeechRecognition()) {
       setIsSupported(false);
@@ -263,6 +270,7 @@ export const useSpeechRecognition = (options: UseSpeechRecognitionOptions = {}) 
     startListening,
     stopListening,
     resetForCommand,
+    waitForWakeWord,
     suspendInput,
     resumeInput,
   };
