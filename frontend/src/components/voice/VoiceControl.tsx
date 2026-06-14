@@ -10,9 +10,25 @@ import { parseCommandLocally } from '../../engine/localParser';
 const GREETINGS = ['我在，请问有什么可以帮您的？', '我在呢，想画点什么？', '嗯，你说，我来画。'];
 const THINKING_REPLIES = ['好的，马上画。', '收到，我来画。'];
 const DONE_REPLIES = ['画好了，看看怎么样？', '完成啦，还想画什么告诉我哦。'];
+const WAKE_WORDS = ['小花小花', '小花', '笑话', '小化', '消化'];
 
 function normalizeSpeechText(text: string): string {
   return text.toLowerCase().replace(/[\s，,。.！!？?、\-\—~～…\.]/g, '');
+}
+
+function stripWakeWords(text: string): string {
+  let cleaned = text.trim().replace(/^[，,。.！!？?、\s]+|[，,。.！!？?、\s]+$/g, '');
+  for (const wakeWord of WAKE_WORDS) {
+    cleaned = cleaned
+      .replace(new RegExp(`^${wakeWord}[，,。.！!？?、\\s]*`), '')
+      .replace(new RegExp(`[，,。.！!？?、\\s]*${wakeWord}$`), '');
+  }
+  return cleaned.trim();
+}
+
+function isOnlyWakeWord(text: string): boolean {
+  const normalized = normalizeSpeechText(text);
+  return WAKE_WORDS.some((wakeWord) => normalized === normalizeSpeechText(wakeWord));
 }
 
 function speak(text: string, onEnd?: () => void) {
@@ -106,10 +122,11 @@ export default function VoiceControl() {
 
   const processCommand = useCallback(
     async (text: string) => {
-      if (!text.trim()) return;
+      const commandText = stripWakeWords(text);
+      if (!commandText || isOnlyWakeWord(text)) return;
 
       // Handle stop commands immediately
-      if (isStopCommand(text)) {
+      if (isStopCommand(commandText)) {
         setStatus('speaking');
         setAssistantText('好的，不画了。');
         wrappedSpeak('好的，不画了。', () => {
@@ -117,13 +134,13 @@ export default function VoiceControl() {
           resetForCmdRef.current();
         });
         addCommandEntry({
-          id: uuidv4(), text, timestamp: Date.now(),
+          id: uuidv4(), text: commandText, timestamp: Date.now(),
           response: '已停止', confidence: 1.0,
         });
         return;
       }
 
-      setFinalText(text);
+      setFinalText(commandText);
       setStatus('processing');
       setGenerating(true);
 
@@ -133,12 +150,12 @@ export default function VoiceControl() {
 
       try {
         const contextSummary = getContextSummary();
-        let parsed = parseCommandLocally(text, contextSummary);
+        let parsed = parseCommandLocally(commandText, contextSummary);
 
         if (!parsed) {
           try {
             parsed = await parseCommand({
-              transcript: text,
+              transcript: commandText,
               canvasState: {
                 objects: contextSummary,
                 width: canvasWidth,
@@ -159,14 +176,14 @@ export default function VoiceControl() {
 
           addCommandEntry({
             id: uuidv4(),
-            text,
+            text: commandText,
             timestamp: Date.now(),
             response: parsed.explanation || '已画到画布上',
             confidence: parsed.confidence ?? 0.8,
           });
         } else {
           const result = await generateImage(
-            text,
+            commandText,
             commandHistory.slice(-5).map((e) => e.text)
           );
 
@@ -174,19 +191,19 @@ export default function VoiceControl() {
             addImage({
               id: uuidv4(),
               imageUrl: proxyImageUrl(result.imageUrl),
-              prompt: text,
+              prompt: commandText,
               x: 400,
               y: 300 + images.length * 30,
               scale: 0.55,
               timestamp: Date.now(),
             });
-            addCommandEntry({ id: uuidv4(), text, timestamp: Date.now(), response: result.explanation || `已生成图像: ${text}`, confidence: 1.0 });
+            addCommandEntry({ id: uuidv4(), text: commandText, timestamp: Date.now(), response: result.explanation || `已生成图像: ${commandText}`, confidence: 1.0 });
           } else {
-            addCommandEntry({ id: uuidv4(), text, timestamp: Date.now(), response: result.error || '没有识别出可绘制内容', confidence: 0 });
+            addCommandEntry({ id: uuidv4(), text: commandText, timestamp: Date.now(), response: result.error || '没有识别出可绘制内容', confidence: 0 });
           }
         }
       } catch (err) {
-        addCommandEntry({ id: uuidv4(), text, timestamp: Date.now(), response: '绘图失败，请重试', confidence: 0 });
+        addCommandEntry({ id: uuidv4(), text: commandText, timestamp: Date.now(), response: '绘图失败，请重试', confidence: 0 });
       }
 
       setGenerating(false);
@@ -229,10 +246,10 @@ export default function VoiceControl() {
     if (fullText) {
       // Extract command after wake word
       const cleaned = fullText.replace(/^[，,。.！!？?、\s]+/, '').replace(/[，,。.！!？?、\s]+$/, '');
-      for (const w of ['小花', '笑话', '小化', '消化']) {
+      for (const w of WAKE_WORDS) {
         const idx = cleaned.indexOf(w);
         if (idx !== -1) {
-          const afterWake = cleaned.substring(idx + w.length).replace(/^[，,。.！!？?、\s]+/, '');
+          const afterWake = stripWakeWords(cleaned.substring(idx + w.length).replace(/^[，,。.！!？?、\s]+/, ''));
           if (afterWake && afterWake.length > 1) {
             // Wake word + command in one breath
             const greeting = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
@@ -279,17 +296,18 @@ export default function VoiceControl() {
     (text: string, isFinal: boolean) => {
       if (isAssistantEcho(text)) return;
       if (!isFinal) {
-        setInterimText(text);
+        setInterimText(stripWakeWords(text));
         return;
       }
       // Ignore input while generating or in cooldown
       if (statusRef.current === 'processing' || statusRef.current === 'speaking') return;
       if (cooldown) return; // 3s cooldown after TTS
-      if (text.trim()) {
-        processCommandRef.current(text.trim());
+      const commandText = stripWakeWords(text);
+      if (commandText && !isOnlyWakeWord(text)) {
+        processCommandRef.current(commandText);
       }
     },
-    [setInterimText, cooldown]
+    [setInterimText, cooldown, isAssistantEcho]
   );
 
   const onErr = useCallback(

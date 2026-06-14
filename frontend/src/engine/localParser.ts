@@ -15,6 +15,10 @@ function nextId(prefix: string): string {
   return `${prefix}-${objCounter}`;
 }
 
+function normalizeCommandText(text: string): string {
+  return text.trim().replace(/[\s，,。.！!？?、\-\—~～…\.]/g, '');
+}
+
 // Extract color from text, optionally near a target word
 function extractColor(text: string, near?: string): string | null {
   const colorMap: Record<string, string> = {
@@ -133,7 +137,7 @@ export function parseCommandLocally(
   transcript: string,
   existingObjects: CanvasObjectSummary[] = []
 ): ParsedCommand | null {
-  const text = transcript.trim();
+  const text = normalizeCommandText(transcript);
   if (!text) return null;
 
   const ops: DrawingOperation[] = [];
@@ -141,7 +145,7 @@ export function parseCommandLocally(
   const place = createAutoPlacer(text, existingObjects);
 
   // --- Clear ---
-  if (/^(清空|清除|清屏|全部清除|擦除全部)$/.test(text)) {
+  if (/^(清空|清空画布|清除|清除画布|清屏|全部清除|擦除全部)$/.test(text)) {
     return {
       operations: [{ op: 'clear' }],
       explanation: '已清空画布',
