@@ -1,15 +1,13 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import http from 'http';
 import { WebSocketServer } from 'ws';
 import commandRoutes from './routes/command.js';
 import imageRoutes from './routes/generateImage.js';
 import proxyRoutes from './routes/proxyImage.js';
 import { createIatConnection } from './services/iflytekService.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
