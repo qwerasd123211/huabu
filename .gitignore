@@ -7,3 +7,6 @@ dist/
 *.tsbuildinfo
 .cache/
 vite.config.ts.timestamp-*
+verification-*.png
+frontend/.claude/
+.vercel

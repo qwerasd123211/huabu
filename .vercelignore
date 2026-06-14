@@ -1,0 +1,8 @@
+frontend/node_modules
+frontend/dist
+server/node_modules
+server/dist
+frontend/.claude
+verification-*.png
+.env
+server/.env
