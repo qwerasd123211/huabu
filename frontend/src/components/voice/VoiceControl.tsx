@@ -519,6 +519,7 @@ export default function VoiceControl() {
         <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>可直接说：</div>
         <div>画一个蓝色圆形</div>
         <div>画蓝天白云和太阳</div>
+        <div>导出图片 / 保存作品</div>
         <div>切换成水彩 / 像素 / 儿童画风格</div>
         <div>把刚才那朵花变大一点</div>
         <div>把右边的太阳移到左上角</div>
