@@ -67,6 +67,9 @@ export default function VoiceControl() {
   const setSupported = useVoiceStore((s) => s.setSupported);
 
   const addImage = useImageStore((s) => s.addImage);
+  const undoImage = useImageStore((s) => s.undoImage);
+  const redoImage = useImageStore((s) => s.redoImage);
+  const clearImages = useImageStore((s) => s.clearImages);
   const setGenerating = useImageStore((s) => s.setGenerating);
   const images = useImageStore((s) => s.images);
   const commandHistory = useVoiceStore((s) => s.commandHistory);
@@ -170,8 +173,9 @@ export default function VoiceControl() {
 
         if (parsed?.operations?.length) {
           const normalOps = parsed.operations.filter((op) => op.op !== 'undo' && op.op !== 'redo');
-          if (parsed.operations.some((op) => op.op === 'undo')) undoCanvas();
-          if (parsed.operations.some((op) => op.op === 'redo')) redoCanvas();
+          if (parsed.operations.some((op) => op.op === 'undo') && !undoImage()) undoCanvas();
+          if (parsed.operations.some((op) => op.op === 'redo') && !redoImage()) redoCanvas();
+          if (parsed.operations.some((op) => op.op === 'clear')) clearImages();
           if (normalOps.length) executeCanvasOperations(normalOps);
 
           addCommandEntry({
@@ -225,6 +229,9 @@ export default function VoiceControl() {
       commandHistory,
       addCommandEntry,
       addImage,
+      undoImage,
+      redoImage,
+      clearImages,
       setGenerating,
       images.length,
       executeCanvasOperations,
