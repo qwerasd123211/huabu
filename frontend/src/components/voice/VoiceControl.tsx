@@ -236,6 +236,7 @@ export default function VoiceControl() {
       setAssistantText(reply);
       wrappedSpeak(reply);
 
+      let hasDrawn = false;
       try {
         const contextSummary = getContextSummary();
         let parsed = parseCommandLocally(commandText, contextSummary);
@@ -261,7 +262,10 @@ export default function VoiceControl() {
           if (parsed.operations.some((op) => op.op === 'undo') && !undoImage()) undoCanvas();
           if (parsed.operations.some((op) => op.op === 'redo') && !redoImage()) redoCanvas();
           if (parsed.operations.some((op) => op.op === 'clear')) clearImages();
-          if (normalOps.length) executeCanvasOperations(normalOps);
+          if (normalOps.length) {
+            executeCanvasOperations(normalOps);
+            hasDrawn = true;
+          }
 
           addCommandEntry({
             id: uuidv4(),
@@ -289,6 +293,7 @@ export default function VoiceControl() {
               timestamp: Date.now(),
             });
             addCommandEntry({ id: uuidv4(), text: commandText, timestamp: Date.now(), response: result.explanation || `已生成图像: ${commandText}`, confidence: 1.0 });
+            hasDrawn = true;
           } else {
             addCommandEntry({ id: uuidv4(), text: commandText, timestamp: Date.now(), response: result.error || '没有识别出可绘制内容', confidence: 0 });
           }
@@ -300,7 +305,9 @@ export default function VoiceControl() {
       setGenerating(false);
       setStatus('speaking');
 
-      const doneReply = DONE_REPLIES[Math.floor(Math.random() * DONE_REPLIES.length)];
+      const doneReply = hasDrawn
+        ? DONE_REPLIES[Math.floor(Math.random() * DONE_REPLIES.length)]
+        : '没听清楚，请换个说法试试';
       setAssistantText(doneReply);
       wrappedSpeak(doneReply, () => {
         // Back to listening — mic was never stopped
@@ -378,10 +385,11 @@ export default function VoiceControl() {
   handleWakeRef.current = handleWake;
 
   const onWake = useCallback((fullText?: string) => {
-    // Ignore wake word during processing or cooldown
-    if (statusRef.current !== 'sleeping') return;
+    // 允许从错误状态通过唤醒词恢复
+    if (statusRef.current !== 'sleeping' && statusRef.current !== 'error') return;
+    setError(null);
     handleWakeRef.current(fullText);
-  }, []);
+  }, [setError]);
 
   const STOP_WORDS = ['停止', '停下来', '不用画了', '不用画', '别画了', '不画了', '不画', '算了', '取消', '停'];
   function isStopCommand(text: string): boolean {
@@ -416,7 +424,8 @@ export default function VoiceControl() {
         setError(error);
         return;
       }
-      if (error === 'no-speech' || error === 'aborted') return;
+      // network 错误：Chrome 在大陆连不上 Google 语音服务，静默忽略，识别会自动重连
+      if (error === 'no-speech' || error === 'aborted' || error === 'network') return;
       setError(error);
     },
     [setError]
