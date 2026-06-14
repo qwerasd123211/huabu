@@ -73,6 +73,7 @@ export const useSpeechRecognition = (options: UseSpeechRecognitionOptions = {}) 
     reconnectTimer: null as ReturnType<typeof setTimeout> | null,
     lastFinal: '',
     speaking: false, // TTS playing → block recognition
+    resumeTimer: null as ReturnType<typeof setTimeout> | null,
   });
 
   ref.current.onResult = options.onResult;
@@ -83,6 +84,10 @@ export const useSpeechRecognition = (options: UseSpeechRecognitionOptions = {}) 
     if (ref.current.reconnectTimer) {
       clearTimeout(ref.current.reconnectTimer);
       ref.current.reconnectTimer = null;
+    }
+    if (ref.current.resumeTimer) {
+      clearTimeout(ref.current.resumeTimer);
+      ref.current.resumeTimer = null;
     }
     if (ref.current.recognition) {
       const r = ref.current.recognition;
@@ -169,9 +174,9 @@ export const useSpeechRecognition = (options: UseSpeechRecognitionOptions = {}) 
 
     recognition.onend = () => {
       // Auto-reconnect for continuous listening
-      if (ref.current.wanted) {
+      if (ref.current.wanted && !ref.current.speaking) {
         ref.current.reconnectTimer = setTimeout(() => {
-          if (ref.current.wanted && ref.current.recognition) {
+          if (ref.current.wanted && !ref.current.speaking && ref.current.recognition) {
             try { ref.current.recognition.start(); } catch { /* already started */ }
           }
         }, 200);
@@ -207,6 +212,14 @@ export const useSpeechRecognition = (options: UseSpeechRecognitionOptions = {}) 
   // Block microphone input during TTS playback
   const suspendInput = useCallback(() => {
     ref.current.speaking = true;
+    if (ref.current.reconnectTimer) {
+      clearTimeout(ref.current.reconnectTimer);
+      ref.current.reconnectTimer = null;
+    }
+    if (ref.current.resumeTimer) {
+      clearTimeout(ref.current.resumeTimer);
+      ref.current.resumeTimer = null;
+    }
     if (ref.current.recognition) {
       try { ref.current.recognition.stop(); } catch { /* ok */ }
     }
@@ -214,10 +227,18 @@ export const useSpeechRecognition = (options: UseSpeechRecognitionOptions = {}) 
 
   // Restore microphone input after TTS playback
   const resumeInput = useCallback(() => {
-    ref.current.speaking = false;
-    if (ref.current.wanted && ref.current.recognition) {
-      try { ref.current.recognition.start(); } catch { /* ok */ }
+    if (ref.current.resumeTimer) {
+      clearTimeout(ref.current.resumeTimer);
     }
+    ref.current.resumeTimer = setTimeout(() => {
+      ref.current.speaking = false;
+      ref.current.resumeTimer = null;
+      ref.current.lastFinal = '';
+      setTranscript('');
+      if (ref.current.wanted && ref.current.recognition) {
+        try { ref.current.recognition.start(); } catch { /* ok */ }
+      }
+    }, 900);
   }, []);
 
   // Called when VAD ends and user wants to speak next command
