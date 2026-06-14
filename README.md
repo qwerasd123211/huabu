@@ -4,7 +4,7 @@
 
 ## Demo
 
-- 在线体验：部署后在这里填写 Vercel Production URL
+- 在线体验：[https://huabu-gamma.vercel.app/](https://huabu-gamma.vercel.app/)
 - Demo 视频：录制后在这里填写公开视频链接
 - 设计文档：[docs/DESIGN.md](docs/DESIGN.md)
 
