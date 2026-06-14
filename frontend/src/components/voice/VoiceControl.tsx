@@ -520,6 +520,8 @@ export default function VoiceControl() {
         <div>画一个蓝色圆形</div>
         <div>画蓝天白云和太阳</div>
         <div>切换成水彩 / 像素 / 儿童画风格</div>
+        <div>把刚才那朵花变大一点</div>
+        <div>把右边的太阳移到左上角</div>
         <div>撤销、重做、清空画布</div>
         <div>停止、不画了</div>
         <div style={{ color: 'var(--accent)', marginTop: 4 }}>

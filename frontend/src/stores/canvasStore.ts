@@ -90,6 +90,7 @@ export const useCanvasStore = create<CanvasState>()(
           kind: obj.shape.kind,
           bbox: getShapeBBox(obj.shape),
           fill: 'fill' in obj.shape ? (obj.shape.fill as string) : '#000',
+          zIndex: obj.zIndex,
         }));
       },
     }),

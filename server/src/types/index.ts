@@ -104,6 +104,11 @@ export interface ModifyOp {
     fill: string;
     stroke: string;
     strokeWidth: number;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    points: number[];
     fontSize: number;
     content: string;
   }>;
@@ -135,6 +140,7 @@ export interface CanvasObjectSummary {
   kind: string;
   bbox: { x: number; y: number; w: number; h: number };
   fill: string;
+  zIndex?: number;
 }
 
 export interface CanvasContext {

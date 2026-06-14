@@ -127,6 +127,195 @@ function createAutoPlacer(text: string, existingObjects: CanvasObjectSummary[] =
   };
 }
 
+function getGroupId(id: string): string {
+  const match = id.match(/^([a-z]+-\d+)/);
+  return match ? match[1] : id;
+}
+
+function getObjectCenter(obj: CanvasObjectSummary): { x: number; y: number } {
+  return {
+    x: obj.bbox.x + obj.bbox.w / 2,
+    y: obj.bbox.y + obj.bbox.h / 2,
+  };
+}
+
+function getGroupBBox(objects: CanvasObjectSummary[]): CanvasObjectSummary['bbox'] {
+  const minX = Math.min(...objects.map((obj) => obj.bbox.x));
+  const minY = Math.min(...objects.map((obj) => obj.bbox.y));
+  const maxX = Math.max(...objects.map((obj) => obj.bbox.x + obj.bbox.w));
+  const maxY = Math.max(...objects.map((obj) => obj.bbox.y + obj.bbox.h));
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+function targetPrefixFromText(text: string): string | null {
+  if (text.includes('太阳')) return 'sun';
+  if (text.includes('花')) return 'flower';
+  if (text.includes('云')) return 'cloud';
+  if (text.includes('树')) return 'tree';
+  if (text.includes('房子')) return 'house';
+  if (text.includes('船')) return 'boat';
+  if (text.includes('圆')) return 'circle';
+  if (text.includes('方形') || text.includes('矩形')) return 'rect';
+  if (text.includes('爱心')) return 'heart';
+  if (text.includes('星星')) return 'star';
+  return null;
+}
+
+function targetPointFromText(text: string): { x: number; y: number } | null {
+  let x: number | null = null;
+  let y: number | null = null;
+
+  if (text.includes('左上')) return { x: 150, y: 120 };
+  if (text.includes('右上')) return { x: 650, y: 120 };
+  if (text.includes('左下')) return { x: 150, y: 480 };
+  if (text.includes('右下')) return { x: 650, y: 480 };
+
+  if (text.includes('左边') || text.includes('左侧')) x = 150;
+  if (text.includes('右边') || text.includes('右侧')) x = 650;
+  if (text.includes('中间') || text.includes('中心')) x = 400;
+  if (text.includes('上面') || text.includes('上方') || text.includes('顶部')) y = 140;
+  if (text.includes('下面') || text.includes('下方') || text.includes('底部')) y = 460;
+  if (text.includes('中间') || text.includes('中心')) y = 300;
+
+  if (x === null && y === null) return null;
+  return { x: x ?? 400, y: y ?? 300 };
+}
+
+function findTargetGroup(text: string, existingObjects: CanvasObjectSummary[]): CanvasObjectSummary[] {
+  const targetPrefix = targetPrefixFromText(text);
+  let candidates = existingObjects.filter((obj) => !isBackgroundBox(obj.bbox));
+
+  if (targetPrefix) {
+    candidates = candidates.filter((obj) => obj.id.startsWith(`${targetPrefix}-`) || obj.id.startsWith(targetPrefix));
+  }
+  if (text.includes('右边') || text.includes('右侧')) {
+    candidates = candidates.filter((obj) => getObjectCenter(obj).x >= 400);
+  }
+  if (text.includes('左边') || text.includes('左侧')) {
+    candidates = candidates.filter((obj) => getObjectCenter(obj).x <= 400);
+  }
+  if (text.includes('上面') || text.includes('上方')) {
+    candidates = candidates.filter((obj) => getObjectCenter(obj).y <= 300);
+  }
+  if (text.includes('下面') || text.includes('下方')) {
+    candidates = candidates.filter((obj) => getObjectCenter(obj).y >= 300);
+  }
+  if (candidates.length === 0) return [];
+
+  const latest = [...candidates].sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0))[0];
+  const groupId = getGroupId(latest.id);
+  return existingObjects.filter((obj) => getGroupId(obj.id) === groupId);
+}
+
+function buildMoveOps(
+  group: CanvasObjectSummary[],
+  target: { x: number; y: number }
+): DrawingOperation[] {
+  const groupBox = getGroupBBox(group);
+  const groupCenter = { x: groupBox.x + groupBox.w / 2, y: groupBox.y + groupBox.h / 2 };
+  const dx = target.x - groupCenter.x;
+  const dy = target.y - groupCenter.y;
+
+  return group.map((obj) => {
+    const b = obj.bbox;
+    if (obj.kind === 'circle') {
+      return { op: 'modify', targetId: obj.id, changes: { cx: b.x + b.w / 2 + dx, cy: b.y + b.h / 2 + dy } };
+    }
+    if (obj.kind === 'line') {
+      return {
+        op: 'modify',
+        targetId: obj.id,
+        changes: { x1: b.x + dx, y1: b.y + dy, x2: b.x + b.w + dx, y2: b.y + b.h + dy },
+      };
+    }
+    return { op: 'modify', targetId: obj.id, changes: { x: b.x + dx, y: b.y + dy } };
+  });
+}
+
+function buildScaleOps(
+  group: CanvasObjectSummary[],
+  factor: number
+): DrawingOperation[] {
+  const groupBox = getGroupBBox(group);
+  const cx = groupBox.x + groupBox.w / 2;
+  const cy = groupBox.y + groupBox.h / 2;
+
+  return group.map((obj) => {
+    const b = obj.bbox;
+    const oldCenter = getObjectCenter(obj);
+    const nextCenter = {
+      x: cx + (oldCenter.x - cx) * factor,
+      y: cy + (oldCenter.y - cy) * factor,
+    };
+
+    if (obj.kind === 'circle') {
+      return {
+        op: 'modify',
+        targetId: obj.id,
+        changes: { cx: nextCenter.x, cy: nextCenter.y, radius: Math.max(3, (b.w / 2) * factor) },
+      };
+    }
+    if (obj.kind === 'line') {
+      return {
+        op: 'modify',
+        targetId: obj.id,
+        changes: {
+          x1: cx + (b.x - cx) * factor,
+          y1: cy + (b.y - cy) * factor,
+          x2: cx + (b.x + b.w - cx) * factor,
+          y2: cy + (b.y + b.h - cy) * factor,
+          strokeWidth: Math.max(1, 3 * factor),
+        },
+      };
+    }
+    return {
+      op: 'modify',
+      targetId: obj.id,
+      changes: {
+        x: nextCenter.x - (b.w * factor) / 2,
+        y: nextCenter.y - (b.h * factor) / 2,
+        width: Math.max(4, b.w * factor),
+        height: Math.max(4, b.h * factor),
+      },
+    };
+  });
+}
+
+function parseLocalModification(text: string, existingObjects: CanvasObjectSummary[]): ParsedCommand | null {
+  if (!/把|将|让|刚才|右边|左边|上面|下面|移动|移到|放到|变大|放大|变小|缩小/.test(text)) return null;
+  if (existingObjects.length === 0) return null;
+
+  const group = findTargetGroup(text, existingObjects);
+  if (group.length === 0) return null;
+
+  if (/变大|放大|大一点|再大/.test(text)) {
+    return {
+      operations: buildScaleOps(group, text.includes('很大') ? 1.5 : 1.25),
+      explanation: '已把目标放大',
+      confidence: 0.9,
+    };
+  }
+
+  if (/变小|缩小|小一点/.test(text)) {
+    return {
+      operations: buildScaleOps(group, 0.8),
+      explanation: '已把目标缩小',
+      confidence: 0.9,
+    };
+  }
+
+  const target = targetPointFromText(text);
+  if (target && /移动|移到|放到|挪到|放在/.test(text)) {
+    return {
+      operations: buildMoveOps(group, target),
+      explanation: '已移动目标位置',
+      confidence: 0.9,
+    };
+  }
+
+  return null;
+}
+
 function extractSize(text: string): number {
   if (text.includes('大') || text.includes('巨大')) return 1.5;
   if (text.includes('小') || text.includes('很小')) return 0.6;
@@ -143,6 +332,9 @@ export function parseCommandLocally(
   const ops: DrawingOperation[] = [];
   const explanations: string[] = [];
   const place = createAutoPlacer(text, existingObjects);
+
+  const localModification = parseLocalModification(text, existingObjects);
+  if (localModification) return localModification;
 
   // --- Clear ---
   if (/^(清空|清空画布|清除|清除画布|清屏|全部清除|擦除全部)$/.test(text)) {
