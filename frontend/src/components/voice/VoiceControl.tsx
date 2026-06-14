@@ -6,6 +6,7 @@ import { generateImage, parseCommand, proxyImageUrl } from '../../services/api';
 import { useImageStore } from '../../stores/imageStore';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { parseCommandLocally } from '../../engine/localParser';
+import { downloadPng, exportCanvasAsPng } from '../../engine/canvasExporter';
 
 const GREETINGS = ['我在，请问有什么可以帮您的？', '我在呢，想画点什么？', '嗯，你说，我来画。'];
 const THINKING_REPLIES = ['好的，马上画。', '收到，我来画。'];
@@ -29,6 +30,11 @@ function stripWakeWords(text: string): string {
 function isOnlyWakeWord(text: string): boolean {
   const normalized = normalizeSpeechText(text);
   return WAKE_WORDS.some((wakeWord) => normalized === normalizeSpeechText(wakeWord));
+}
+
+function isExportCommand(text: string): boolean {
+  const normalized = normalizeSpeechText(text);
+  return /^(导出|导出图片|导出作品|保存|保存图片|保存作品|下载|下载图片|下载作品)$/.test(normalized);
 }
 
 function speak(text: string, onEnd?: () => void) {
@@ -72,7 +78,9 @@ export default function VoiceControl() {
   const clearImages = useImageStore((s) => s.clearImages);
   const setGenerating = useImageStore((s) => s.setGenerating);
   const images = useImageStore((s) => s.images);
+  const loadedImages = useImageStore((s) => s.loadedImages);
   const commandHistory = useVoiceStore((s) => s.commandHistory);
+  const objects = useCanvasStore((s) => s.objects);
   const executeCanvasOperations = useCanvasStore((s) => s.executeOperations);
   const undoCanvas = useCanvasStore((s) => s.undo);
   const redoCanvas = useCanvasStore((s) => s.redo);
@@ -140,6 +148,46 @@ export default function VoiceControl() {
           id: uuidv4(), text: commandText, timestamp: Date.now(),
           response: '已停止', confidence: 1.0,
         });
+        return;
+      }
+
+      if (isExportCommand(commandText)) {
+        setStatus('processing');
+        setAssistantText('好的，正在导出图片。');
+        try {
+          const dataUrl = await exportCanvasAsPng({
+            objects,
+            images,
+            loadedImages,
+            width: canvasWidth,
+            height: canvasHeight,
+          });
+          downloadPng(dataUrl, `voice-canvas-${Date.now()}.png`);
+          addCommandEntry({
+            id: uuidv4(),
+            text: commandText,
+            timestamp: Date.now(),
+            response: '已导出 PNG 图片',
+            confidence: 1,
+          });
+          setStatus('speaking');
+          setAssistantText('图片已经导出好了。');
+          wrappedSpeak('图片已经导出好了。', () => {
+            setStatus('listening');
+            resetForCmdRef.current();
+            startCooldown();
+          });
+        } catch {
+          addCommandEntry({
+            id: uuidv4(),
+            text: commandText,
+            timestamp: Date.now(),
+            response: '导出失败，请稍后重试',
+            confidence: 0,
+          });
+          setError('export-failed');
+          setStatus('error');
+        }
         return;
       }
 
@@ -233,13 +281,17 @@ export default function VoiceControl() {
       redoImage,
       clearImages,
       setGenerating,
+      objects,
       images.length,
+      images,
+      loadedImages,
       executeCanvasOperations,
       undoCanvas,
       redoCanvas,
       getContextSummary,
       canvasWidth,
       canvasHeight,
+      setError,
       startCooldown,
     ]
   );
