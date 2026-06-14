@@ -7,6 +7,7 @@ import { useImageStore } from '../../stores/imageStore';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { parseCommandLocally } from '../../engine/localParser';
 import { downloadPng, exportCanvasAsPng } from '../../engine/canvasExporter';
+import { STYLE_CONFIGS, type StyleMode, useStyleStore } from '../../stores/styleStore';
 
 const GREETINGS = ['我在，请问有什么可以帮您的？', '我在呢，想画点什么？', '嗯，你说，我来画。'];
 const THINKING_REPLIES = ['好的，马上画。', '收到，我来画。'];
@@ -35,6 +36,15 @@ function isOnlyWakeWord(text: string): boolean {
 function isExportCommand(text: string): boolean {
   const normalized = normalizeSpeechText(text);
   return /^(导出|导出图片|导出作品|保存|保存图片|保存作品|下载|下载图片|下载作品)$/.test(normalized);
+}
+
+function getStyleCommand(text: string): StyleMode | null {
+  const normalized = normalizeSpeechText(text);
+  if (/水彩/.test(normalized)) return 'watercolor';
+  if (/像素|马赛克/.test(normalized)) return 'pixel';
+  if (/儿童画|蜡笔|童趣/.test(normalized)) return 'childlike';
+  if (/默认|普通|原始|取消风格|关闭风格|恢复默认/.test(normalized)) return 'default';
+  return null;
 }
 
 function speak(text: string, onEnd?: () => void) {
@@ -71,6 +81,8 @@ export default function VoiceControl() {
   const setError = useVoiceStore((s) => s.setError);
   const isSupported = useVoiceStore((s) => s.isSupported);
   const setSupported = useVoiceStore((s) => s.setSupported);
+  const styleMode = useStyleStore((s) => s.styleMode);
+  const setStyleMode = useStyleStore((s) => s.setStyleMode);
 
   const addImage = useImageStore((s) => s.addImage);
   const undoImage = useImageStore((s) => s.undoImage);
@@ -191,6 +203,29 @@ export default function VoiceControl() {
         return;
       }
 
+      if (/风格|水彩|像素|儿童画|蜡笔|童趣|恢复默认|取消风格|关闭风格/.test(commandText)) {
+        const nextMode = getStyleCommand(commandText);
+        if (nextMode) {
+          setStyleMode(nextMode);
+          const label = STYLE_CONFIGS[nextMode].label;
+          addCommandEntry({
+            id: uuidv4(),
+            text: commandText,
+            timestamp: Date.now(),
+            response: `已切换为${label}`,
+            confidence: 1,
+          });
+          setStatus('speaking');
+          setAssistantText(`已切换为${label}。`);
+          wrappedSpeak(`已切换为${label}。`, () => {
+            setStatus('listening');
+            resetForCmdRef.current();
+            startCooldown();
+          });
+          return;
+        }
+      }
+
       setFinalText(commandText);
       setStatus('processing');
       setGenerating(true);
@@ -235,7 +270,9 @@ export default function VoiceControl() {
           });
         } else {
           const result = await generateImage(
-            commandText,
+            STYLE_CONFIGS[styleMode].prompt
+              ? `${STYLE_CONFIGS[styleMode].prompt}. ${commandText}`
+              : commandText,
             commandHistory.slice(-5).map((e) => e.text)
           );
 
@@ -276,6 +313,8 @@ export default function VoiceControl() {
       setStatus,
       commandHistory,
       addCommandEntry,
+      styleMode,
+      setStyleMode,
       addImage,
       undoImage,
       redoImage,
@@ -480,8 +519,12 @@ export default function VoiceControl() {
         <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>可直接说：</div>
         <div>画一个蓝色圆形</div>
         <div>画蓝天白云和太阳</div>
+        <div>切换成水彩 / 像素 / 儿童画风格</div>
         <div>撤销、重做、清空画布</div>
         <div>停止、不画了</div>
+        <div style={{ color: 'var(--accent)', marginTop: 4 }}>
+          当前：{STYLE_CONFIGS[styleMode].label}
+        </div>
       </div>
     </div>
   );
